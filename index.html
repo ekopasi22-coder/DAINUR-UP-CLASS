@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V7 - Manajemen Kelas 8E — SMP Negeri 15 Balikpapan</title>
+<title>Manajemen Kelas 8E — SMP Negeri 15 Balikpapan</title>
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-400.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-600.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-700.css" rel="stylesheet">
@@ -239,7 +239,7 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
 .poster ol{gap:8px}
 .poster ol li{font-size:14px;line-height:1.35;padding:10px 14px 10px 50px}
 .poster .pf{margin-top:16px;font-size:11.5px}
-.surat-page{width:794px;min-height:1123px;height:1123px;max-width:794px;margin:14px auto;padding:30px 42px;box-sizing:border-box;overflow:hidden}
+.surat-page{width:794px;min-height:1123px;height:auto;max-width:794px;margin:14px auto;padding:34px 48px 42px;box-sizing:border-box;overflow:visible}
 .surat-page .kop{width:100%;margin:0 0 16px;padding:0 0 8px;box-sizing:border-box}
 .surat-page .kop img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain;margin:0 auto}
 .surat-page .hal{margin:6px 0 12px}
@@ -247,6 +247,30 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
 .surat-page .surat-info{margin:7px 0 10px 18px}
 .sig-row{margin-top:18px}
 
+/* ===== V9: PIKET 5 HARI DALAM 1 LEMBAR A4 POTRET ===== */
+@media screen{
+  .piket-poster{width:794px;max-width:794px;height:1123px;min-height:1123px;box-sizing:border-box}
+  .piket-poster .cols{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:repeat(5,1fr)!important;gap:8px!important;height:930px!important;overflow:visible!important}
+  .piket-poster .day-box{min-height:0!important;height:auto!important;box-sizing:border-box!important}
+}
+.piket-poster.export-mode .cols{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:repeat(5,1fr)!important}
+.piket-poster.export-mode .day-box{min-height:0!important;height:auto!important}
+
+@media print{
+  #printRoot .surat-page{
+    width:210mm!important;
+    min-height:297mm!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    padding:10mm 14mm 12mm!important;
+    font-size:11pt!important;
+    line-height:1.35!important;
+    box-sizing:border-box!important;
+  }
+  #printRoot .surat-page .kop{margin-bottom:5mm!important;padding-bottom:3mm!important}
+  #printRoot .surat-page .surat-info{margin-top:4mm!important;margin-bottom:5mm!important}
+}
 </style>
 </head>
 <body>
@@ -533,8 +557,8 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
       <div class="piket-grid no-export" id="piketControls"></div>
       <div class="toolbar">
         <button class="btn red" onclick="hapusSemuaPiket()">🗑 Hapus Pilihan</button>
-        <button class="btn gry" onclick="exportPDF(document.getElementById('piketPoster'),'Jadwal-Piket-'+state.namaKelas+'.pdf',1150)">⬇ Download PDF</button>
-        <button class="btn gry" onclick="exportJPEG(document.getElementById('piketPoster'),'Jadwal-Piket-'+state.namaKelas+'.jpeg',1150)">⬇ Download JPEG</button>
+        <button class="btn gry" onclick="exportPDF(document.getElementById('piketPoster'),'Jadwal-Piket-'+state.namaKelas+'.pdf',794)">⬇ Download PDF</button>
+        <button class="btn gry" onclick="exportJPEG(document.getElementById('piketPoster'),'Jadwal-Piket-'+state.namaKelas+'.jpeg',794)">⬇ Download JPEG</button>
       </div>
       <div class="piket-poster" id="piketPoster">
         <h3>🧹 JADWAL PIKET KELAS <span id="hNamaKelasPiket">8E</span></h3>
@@ -761,7 +785,7 @@ async function captureNode(node,forcedWidth){
   if(!node)throw new Error('Elemen ekspor tidak ditemukan');
   if(typeof html2canvas!=='function')throw new Error('Library html2canvas tidak termuat. Muat ulang halaman.');
   const kind=exportKind(node);
-  const width=forcedWidth||({kesepakatan:794,piket:1122,absensi:900,surat:794,denah:1150,struktur:1150}[kind]||900);
+  const width=forcedWidth||({kesepakatan:794,piket:794,absensi:900,surat:794,denah:1150,struktur:1150}[kind]||900);
   const section=node.closest('section.tab');
   const wasActive=section?section.classList.contains('active'):true;
   if(section&&!wasActive)section.classList.add('active');
@@ -795,20 +819,71 @@ async function captureNode(node,forcedWidth){
     clone.querySelectorAll('.poster ol li').forEach(li=>{li.style.setProperty('background','#2ca9a3','important');li.style.setProperty('color','#fff','important');});
   }
   if(kind==='piket'){
-    clone.style.width='1122px!important';
+    // SATU LEMBAR A4 POTRET: 794 x 1123 px. Lima hari disusun vertikal dan dipadatkan proporsional.
+    clone.style.setProperty('width','794px','important');
+    clone.style.setProperty('height','1123px','important');
+    clone.style.setProperty('max-width','794px','important');
+    clone.style.setProperty('min-height','1123px','important');
+    clone.style.setProperty('overflow','hidden','important');
     const pp=clone.querySelector('.piket-poster');
     if(pp){
-      pp.style.setProperty('width','1122px','important');
+      pp.style.setProperty('width','794px','important');
+      pp.style.setProperty('height','1123px','important');
+      pp.style.setProperty('min-height','1123px','important');
+      pp.style.setProperty('max-height','1123px','important');
       pp.style.setProperty('margin','0','important');
-      pp.style.setProperty('padding','28px 28px','important');
+      pp.style.setProperty('padding','24px 34px 22px','important');
       pp.style.setProperty('background','#0d9488','important');
       pp.style.setProperty('color','#fff','important');
+      pp.style.setProperty('box-sizing','border-box','important');
+      pp.style.setProperty('border-radius','0','important');
+      pp.style.setProperty('overflow','hidden','important');
     }
+    const title=clone.querySelector('.piket-poster h3');
+    if(title){
+      title.textContent='JADWAL PIKET KELAS '+((state.namaKelas||'').toUpperCase());
+      title.style.setProperty('font-size','22px','important');
+      title.style.setProperty('margin','0 0 4px','important');
+    }
+    const sub=clone.querySelector('.piket-poster .pp-sub');
+    if(sub){sub.style.setProperty('font-size','11px','important');sub.style.setProperty('margin','0 0 8px','important');}
     const cols=clone.querySelector('.cols');
-    if(cols)cols.style.setProperty('grid-template-columns','repeat(5,minmax(0,1fr))','important');
-    clone.querySelectorAll('.piket-poster .day-box').forEach(box=>{box.style.setProperty('background','#2ca9a3','important');box.style.setProperty('color','#fff','important');});
-    clone.querySelectorAll('.piket-poster .day-box b').forEach(b=>b.style.setProperty('color','#fff','important'));
-    clone.querySelectorAll('.piket-poster .day-box span').forEach(sp=>sp.style.setProperty('color','#fff','important'));
+    if(cols){
+      cols.style.setProperty('display','grid','important');
+      cols.style.setProperty('grid-template-columns','1fr','important');
+      cols.style.setProperty('grid-template-rows','repeat(5,1fr)','important');
+      cols.style.setProperty('gap','7px','important');
+      cols.style.setProperty('width','100%','important');
+      cols.style.setProperty('height','930px','important');
+      cols.style.setProperty('overflow','hidden','important');
+    }
+    clone.querySelectorAll('.piket-poster .day-box').forEach(box=>{
+      box.style.setProperty('min-height','0','important');
+      box.style.setProperty('height','auto','important');
+      box.style.setProperty('padding','7px 12px','important');
+      box.style.setProperty('background','#2ca9a3','important');
+      box.style.setProperty('color','#fff','important');
+      box.style.setProperty('border-radius','9px','important');
+      box.style.setProperty('box-sizing','border-box','important');
+      box.style.setProperty('overflow','hidden','important');
+    });
+    clone.querySelectorAll('.piket-poster .day-box b').forEach(b=>{
+      b.style.setProperty('color','#fff','important');
+      b.style.setProperty('font-size','12px','important');
+      b.style.setProperty('margin-bottom','4px','important');
+      b.style.setProperty('display','block','important');
+    });
+    clone.querySelectorAll('.piket-poster .day-box span').forEach(sp=>{
+      sp.style.setProperty('color','#fff','important');
+      sp.style.setProperty('display','block','important');
+      sp.style.setProperty('font-size','11px','important');
+      sp.style.setProperty('line-height','1.22','important');
+      sp.style.setProperty('padding','1.5px 0','important');
+    });
+    // Hilangkan ikon kuas/sapu dari judul maupun elemen dekoratif saat ekspor.
+    clone.querySelectorAll('.piket-poster').forEach(el=>{
+      el.innerHTML=el.innerHTML.replace(/🧹/g,'');
+    });
   }
   if(kind==='absensi'){
     clone.style.width='900px!important';
@@ -830,20 +905,22 @@ async function captureNode(node,forcedWidth){
   if(kind==='surat'){
     const page=clone.classList.contains('surat-page')?clone:clone.querySelector('.surat-page');
     if(page){
+      // Surat: SATU halaman A4 potret, kop dan isi berada dalam flow yang sama.
       page.style.setProperty('display','block','important');
       page.style.setProperty('position','relative','important');
       page.style.setProperty('width','794px','important');
-      page.style.setProperty('height','1123px','important');
+      page.style.setProperty('height','auto','important');
       page.style.setProperty('min-height','1123px','important');
-      page.style.setProperty('max-height','1123px','important');
-      page.style.setProperty('overflow','hidden','important');
-      page.style.setProperty('padding','30px 42px','important');
+      page.style.setProperty('max-height','none','important');
+      page.style.setProperty('overflow','visible','important');
+      page.style.setProperty('padding','34px 48px 42px','important');
       page.style.setProperty('margin','0','important');
-      page.style.setProperty('font-size','12.5px','important');
-      page.style.setProperty('line-height','1.5','important');
+      page.style.setProperty('font-size','12px','important');
+      page.style.setProperty('line-height','1.4','important');
       page.style.setProperty('background','#fff','important');
       page.style.setProperty('border','0','important');
       page.style.setProperty('box-shadow','none','important');
+      page.style.setProperty('box-sizing','border-box','important');
       const kop=page.querySelector('.kop');
       if(kop){kop.style.setProperty('display','block','important');kop.style.setProperty('width','100%','important');kop.style.setProperty('margin','0 0 16px','important');kop.style.setProperty('padding','0 0 8px','important');kop.style.setProperty('border-bottom','4px double #111','important');}
       const ki=page.querySelector('.kop img');
@@ -911,7 +988,7 @@ async function exportPDF(node,name,fw){
     const cv=await captureNode(node,fw);
     const js=window.jspdf&&window.jspdf.jsPDF;if(!js)throw new Error('Library jsPDF tidak termuat.');
     const kind=exportKind(node);
-    const landscape=(kind==='piket');
+    const landscape=false;
     const pdf=new js(landscape?'l':'p','mm','a4');
     const pw=landscape?297:210,ph=landscape?210:297,margin=8;
     const usableW=pw-margin*2,usableH=ph-margin*2;
