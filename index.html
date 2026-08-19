@@ -707,105 +707,123 @@ function studentOptions(sel){return '<option value="">— pilih siswa —</optio
 function compressImage(file,max){return new Promise(res=>{const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');const r=Math.min(1,(max||260)/Math.max(img.width,img.height));c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.85));};img.src=e.target.result;};rd.readAsDataURL(file);});}
 
 /* ================= EXPORT ================= */
-async function waitForImages(root){
+function waitForImages(root){
   const imgs=[...root.querySelectorAll('img')];
-  await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{
-    img.addEventListener('load',res,{once:true});
-    img.addEventListener('error',res,{once:true});
+  return Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{
+    img.addEventListener('load',res,{once:true}); img.addEventListener('error',res,{once:true});
   })));
 }
-function replaceCanvasesWithImages(source,clone){
-  const srcs=[...source.querySelectorAll('canvas')];
-  const dsts=[...clone.querySelectorAll('canvas')];
-  dsts.forEach((dst,i)=>{
-    const src=srcs[i];
-    if(!src)return;
-    try{
-      const img=document.createElement('img');
-      img.src=src.toDataURL('image/png');
-      img.style.cssText='display:block;width:100%;height:100%;object-fit:contain;';
-      dst.replaceWith(img);
-    }catch(e){
-      // Keep the canvas if a browser blocks conversion.
-    }
+function nextPaint(){return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
+
+/*
+  EXPORT ENGINE v2
+  Jangan menggandakan node ke posisi off-screen. Chrome Android + html2canvas
+  dapat menghasilkan canvas putih untuk elemen off-screen. Kita tangkap node asli
+  yang sedang tampil, sementara ukurannya diubah ke kanvas A4, lalu semua style
+  dikembalikan seperti semula.
+*/
+async function captureNode(node,forcedWidth){
+  if(!node) throw new Error('Elemen ekspor tidak ditemukan');
+  if(typeof html2canvas!=='function') throw new Error('html2canvas belum termuat');
+
+  const width=forcedWidth||794;
+  const old={
+    position:node.style.position, left:node.style.left, top:node.style.top,
+    width:node.style.width, maxWidth:node.style.maxWidth, minHeight:node.style.minHeight,
+    height:node.style.height, margin:node.style.margin, padding:node.style.padding,
+    border:node.style.border, borderRadius:node.style.borderRadius,
+    boxShadow:node.style.boxShadow, background:node.style.background,
+    opacity:node.style.opacity, visibility:node.style.visibility,
+    zIndex:node.style.zIndex, overflow:node.style.overflow
+  };
+  const oldBodyOverflow=document.body.style.overflow;
+  const hidden=[];
+  node.querySelectorAll('.no-export').forEach(el=>{
+    hidden.push([el,el.style.display]); el.style.display='none';
   });
-}
-async function nodeToCanvas(node,forcedWidth){
-  const width=forcedWidth||794; // CSS px equivalent of A4 at 96dpi
-  const clone=node.cloneNode(true);
-  clone.classList.add('export-mode');
-  clone.style.position='absolute';
-  clone.style.left='-100000px';
-  clone.style.top='0';
-  clone.style.width=width+'px';
-  clone.style.maxWidth='none';
-  clone.style.height='auto';
-  clone.style.opacity='1';
-  clone.style.visibility='visible';
-  clone.style.pointerEvents='none';
-  clone.style.zIndex='-1';
-  clone.style.background='#fff';
 
-  // Make the report print-friendly without changing the live page.
-  clone.querySelectorAll('.no-export').forEach(el=>el.remove());
-  replaceCanvasesWithImages(node,clone);
+  node.classList.add('export-mode');
+  node.style.position='fixed';
+  node.style.left='0px';
+  node.style.top='0px';
+  node.style.width=width+'px';
+  node.style.maxWidth='none';
+  node.style.height='auto';
+  node.style.minHeight='0';
+  node.style.margin='0';
+  node.style.borderRadius='0';
+  node.style.boxShadow='none';
+  node.style.background='#fff';
+  node.style.opacity='1';
+  node.style.visibility='visible';
+  node.style.zIndex='50000';
+  node.style.overflow='visible';
+  document.body.style.overflow='hidden';
 
-  // Force A4 portrait geometry for letters.
-  if(clone.classList.contains('surat-page')){
-    clone.style.width='794px';
-    clone.style.minHeight='1123px';
-    clone.style.boxSizing='border-box';
-    clone.style.margin='0';
-    clone.style.padding='56px 64px';
-    clone.style.border='0';
-    clone.style.borderRadius='0';
-    clone.style.boxShadow='none';
-    clone.style.fontSize='12px';
-    const kop=clone.querySelector('.kop');
-    if(kop){kop.style.margin='0 0 20px';kop.style.padding='0 0 10px';}
-    const ki=clone.querySelector('.kop img');
-    if(ki){ki.style.width='100%';ki.style.height='auto';ki.style.maxHeight='none';}
+  // Surat harus selalu A4 portrait dan kop memenuhi lebar area surat.
+  if(node.classList.contains('surat-page')){
+    node.style.width='794px';
+    node.style.minHeight='1123px';
+    node.style.padding='57px 64px';
+    const kop=node.querySelector('.kop');
+    if(kop){kop.style.margin='0 0 22px';kop.style.padding='0 0 10px';}
+    const ki=node.querySelector('.kop img');
+    if(ki){ki.style.display='block';ki.style.width='100%';ki.style.height='auto';ki.style.maxHeight='none';}
   }
 
-  document.body.appendChild(clone);
-  await waitForImages(clone);
-  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  // Canvas Chart.js tetap memakai canvas asli; html2canvas bisa menangkapnya
+  // karena elemen sekarang berada di viewport.
+  await waitForImages(node);
+  await nextPaint();
+  let cv;
   try{
-    return await html2canvas(clone,{
+    cv=await html2canvas(node,{
       scale:2,
       backgroundColor:'#ffffff',
       useCORS:true,
       allowTaint:true,
       logging:false,
-      width,
-      windowWidth:width,
-      scrollX:0,
-      scrollY:0
+      width:node.getBoundingClientRect().width,
+      height:node.scrollHeight,
+      windowWidth:Math.max(window.innerWidth,width),
+      windowHeight:Math.max(window.innerHeight,node.scrollHeight),
+      scrollX:0,scrollY:0,
+      onclone:function(doc){
+        const el=doc.querySelector('#'+node.id);
+        if(el){el.style.visibility='visible';el.style.opacity='1';}
+      }
     });
-  }finally{document.body.removeChild(clone);}
+  }finally{
+    node.classList.remove('export-mode');
+    Object.entries(old).forEach(([k,v])=>node.style[k]=v);
+    hidden.forEach(([el,v])=>el.style.display=v);
+    document.body.style.overflow=oldBodyOverflow;
+  }
+  return cv;
 }
+
 async function exportJPEG(node,name,fw){
   if(!node){toast('Belum ada konten untuk diunduh','warn');return;}
   showOverlay('Menyiapkan JPEG…');
   try{
-    const cv=await nodeToCanvas(node,fw||794);
+    const cv=await captureNode(node,fw||794);
     const a=document.createElement('a');
     a.href=cv.toDataURL('image/jpeg',.95);
     a.download=name;
-    a.click();
+    document.body.appendChild(a);a.click();a.remove();
     toast('✅ JPEG berhasil diunduh','ok');
-  }catch(e){
-    console.error(e);toast('❌ Gagal membuat JPEG','err');
-  }finally{hideOverlay();}
+  }catch(e){console.error(e);toast('❌ JPEG gagal dibuat: '+e.message,'err');}
+  finally{hideOverlay();}
 }
+
 async function exportPDF(node,name,fw){
   if(!node){toast('Belum ada konten untuk diunduh','warn');return;}
   showOverlay('Menyiapkan PDF A4 potret…');
   try{
-    const cv=await nodeToCanvas(node,fw||794);
-    const{jsPDF}=window.jspdf;
-    if(!jsPDF)throw new Error('jsPDF tidak tersedia');
-    const pdf=new jsPDF('p','mm','a4');
+    const cv=await captureNode(node,fw||794);
+    const js=window.jspdf&&window.jspdf.jsPDF;
+    if(!js)throw new Error('jsPDF belum termuat');
+    const pdf=new js('p','mm','a4');
     const pageW=210,pageH=297;
     const pxPerPage=cv.width*(pageH/pageW);
     let offset=0,page=0;
@@ -818,14 +836,13 @@ async function exportPDF(node,name,fw){
       ctx.drawImage(cv,0,offset,cv.width,sliceH,0,0,cv.width,sliceH);
       if(page>0)pdf.addPage('a4','p');
       const h=pageW*(slice.height/slice.width);
-      pdf.addImage(slice.toDataURL('image/jpeg',.96),'JPEG',0,0,pageW,h,undefined,'FAST');
+      pdf.addImage(slice.toDataURL('image/jpeg',.97),'JPEG',0,0,pageW,h,undefined,'FAST');
       offset+=sliceH;page++;
     }
     pdf.save(name);
     toast('✅ PDF A4 potret berhasil diunduh'+(page>1?' ('+page+' halaman)':''),'ok');
-  }catch(e){
-    console.error(e);toast('❌ Gagal membuat PDF — buka Pratinjau lalu coba lagi','err');
-  }finally{hideOverlay();}
+  }catch(e){console.error(e);toast('❌ PDF gagal dibuat: '+e.message,'err');}
+  finally{hideOverlay();}
 }
 
 /* ================= TABS ================= */
