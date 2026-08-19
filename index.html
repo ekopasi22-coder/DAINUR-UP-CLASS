@@ -77,7 +77,7 @@ table.tb input[type=number]{width:62px;text-align:center}
 .ocr-bar{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:10px;display:none}
 .ocr-bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--pri),var(--acc));transition:.2s}
 /* POSTER KESEPAKATAN */
-.poster{background:linear-gradient(160deg,#0b7f74,#0d9488 40%,#0891b2);border-radius:22px;color:#fff;padding:30px 34px;max-width:900px;margin:16px auto;box-shadow:var(--sh);box-sizing:border-box}
+.poster{background:#0d9488;border-radius:22px;color:#fff;padding:30px 34px;max-width:794px;min-height:1000px;margin:16px auto;box-shadow:var(--sh);box-sizing:border-box}
 .poster h3{text-align:center;font-size:28px;font-weight:800;letter-spacing:.5px;margin:0}
 .poster .ps{text-align:center;font-size:14px;opacity:.92;margin:6px 0 20px;font-weight:600}
 .poster ol{list-style:none;counter-reset:rr;display:grid;gap:10px;margin:0;padding:0}
@@ -112,7 +112,7 @@ table.tb input[type=number]{width:62px;text-align:center}
 .piket-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:10px}
 .piket-day{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:13px}
 .piket-day h4{font-size:14px;font-weight:800;color:#0f766e;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.piket-poster{background:linear-gradient(160deg,#0b7f74,#0e7490);border-radius:20px;color:#fff;padding:24px 28px;margin-top:14px;box-sizing:border-box;width:100%}
+.piket-poster{background:#0d9488;border-radius:20px;color:#fff;padding:24px 28px;margin-top:14px;box-sizing:border-box;width:100%}
 .piket-poster h3{text-align:center;font-size:24px;font-weight:800;margin:0}
 .piket-poster .pp-sub{text-align:center;font-size:13px;opacity:.9;margin:5px 0 18px;font-weight:600}
 .piket-poster .cols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
@@ -168,8 +168,8 @@ table.tb input[type=number]{width:62px;text-align:center}
 #modal{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:350;display:none;align-items:flex-start;justify-content:center;padding:26px 14px;overflow:auto}
 #modalBox{background:#fff;border-radius:18px;max-width:820px;width:100%;padding:18px;position:relative;animation:fadein .2s}
 #modalClose{position:absolute;top:10px;right:12px;border:none;background:#f1f5f9;width:30px;height:30px;border-radius:50%;font-weight:800}
-.chart-box{position:relative;height:360px;max-width:620px;margin:0 auto 10px;overflow:hidden}
-.chart-box canvas,.chart-box img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important}
+.chart-box{position:relative;height:300px;max-width:560px;margin:0 auto 14px;overflow:hidden}
+.chart-box canvas,.chart-box img{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important;object-fit:contain!important}
 
 /* READONLY */
 body.readonly input,body.readonly select,body.readonly textarea,body.readonly label.filelbl{pointer-events:none;opacity:.55}
@@ -687,12 +687,18 @@ function migratePiket(st){
     st.piketHari=hari; st.piketList=hari.map(h=>st.piket[h]||[]);
     delete st.piket;
   }
-  if(!st.piketHari||!st.piketHari.length){st.piketHari=DEFAULT_HARI_PIKET.slice();}
-  if(!st.piketList){st.piketList=st.piketHari.map(()=>[]);}
+  if(!st.piketHari||!st.piketHari.length)st.piketHari=DEFAULT_HARI_PIKET.slice();
+  if(!Array.isArray(st.piketList))st.piketList=st.piketHari.map(()=>[]);
   while(st.piketList.length<st.piketHari.length)st.piketList.push([]);
-  // Piket dikunci tetap 5 hari (Senin–Jumat)
+  // Piket selalu 5 hari (Senin–Jumat). Jika data lama kosong seluruhnya,
+  // isi kembali pembagian siswa 7 orang per hari agar hasil ekspor tidak kosong.
   st.piketHari=DEFAULT_HARI_PIKET.slice();
-  st.piketList=DEFAULT_HARI_PIKET.map((_,i)=>st.piketList[i]||[]);
+  st.piketList=DEFAULT_HARI_PIKET.map((_,i)=>Array.isArray(st.piketList[i])?st.piketList[i]:[]);
+  const validPiketCount=st.piketList.flat().filter(id=>Array.isArray(st.students)&&st.students.some(s=>s.id===id)).length;
+  const kosong=st.piketList.every(a=>!a||a.length===0);
+  if((kosong||validPiketCount===0) && Array.isArray(st.students) && st.students.length){
+    st.piketList=DEFAULT_HARI_PIKET.map((_,i)=>st.students.slice(i*7,i*7+7).map(s=>s.id));
+  }
   if(!st.namaKelas)st.namaKelas='8E';
   if(!st.petugasAbsensi)st.petugasAbsensi=[];
   if(st.linkAbsenOnline===undefined)st.linkAbsenOnline='';
@@ -728,7 +734,7 @@ function nextPaint(){return new Promise(r=>requestAnimationFrame(()=>requestAnim
 function exportKind(node){
   if(!node)return 'normal';
   if(node.id==='absensiReport')return 'absensi';
-  if(node.id==='posterArea')return 'poster';
+  if(node.id==='posterArea')return 'kesepakatan';
   if(node.id==='piketPoster')return 'piket';
   if(node.id==='suratPreview'||node.classList.contains('surat-page'))return 'surat';
   if(node.id==='denahStage')return 'denah';
@@ -739,7 +745,7 @@ async function captureNode(node,forcedWidth){
   if(!node)throw new Error('Elemen ekspor tidak ditemukan');
   if(typeof html2canvas!=='function')throw new Error('Library html2canvas tidak termuat. Muat ulang halaman.');
   const kind=exportKind(node);
-  const width=forcedWidth||({poster:1200,piket:1536,absensi:900,surat:794,denah:1150,struktur:1150}[kind]||900);
+  const width=forcedWidth||({kesepakatan:794,piket:1122,absensi:900,surat:794,denah:1150,struktur:1150}[kind]||900);
   const section=node.closest('section.tab');
   const wasActive=section?section.classList.contains('active'):true;
   if(section&&!wasActive)section.classList.add('active');
@@ -754,40 +760,74 @@ async function captureNode(node,forcedWidth){
   clone.style.cssText='display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;left:0!important;top:0!important;width:'+width+'px!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;background:#fff!important;box-shadow:none!important;overflow:visible!important;box-sizing:border-box!important;';
   clone.querySelectorAll('.no-export,button,input[type=file]').forEach(el=>el.remove());
 
-  if(kind==='poster'){
-    clone.style.width='900px!important';
-    clone.style.maxWidth='900px!important';
+  if(kind==='kesepakatan'){
+    clone.style.width='794px!important';
+    clone.style.maxWidth='794px!important';
     clone.style.margin='0 auto!important';
-    clone.querySelector('.poster')?.style.setProperty('max-width','900px','important');
-    clone.querySelector('.poster')?.style.setProperty('margin','0 auto','important');
+    const po=clone.querySelector('.poster');
+    if(po){
+      po.style.setProperty('width','794px','important');
+      po.style.setProperty('max-width','794px','important');
+      po.style.setProperty('min-height','1000px','important');
+      po.style.setProperty('margin','0','important');
+      po.style.setProperty('padding','30px 34px','important');
+      po.style.setProperty('background','#0d9488','important');
+      po.style.setProperty('color','#fff','important');
+    }
+    clone.querySelectorAll('.poster ol li').forEach(li=>{li.style.setProperty('background','#2ca9a3','important');li.style.setProperty('color','#fff','important');});
   }
   if(kind==='piket'){
-    clone.style.width='1536px!important';
+    clone.style.width='1122px!important';
     const pp=clone.querySelector('.piket-poster');
-    if(pp){pp.style.setProperty('width','1536px','important');pp.style.setProperty('margin','0','important');pp.style.setProperty('padding','30px 36px','important');}
+    if(pp){
+      pp.style.setProperty('width','1122px','important');
+      pp.style.setProperty('margin','0','important');
+      pp.style.setProperty('padding','28px 28px','important');
+      pp.style.setProperty('background','#0d9488','important');
+      pp.style.setProperty('color','#fff','important');
+    }
     const cols=clone.querySelector('.cols');
     if(cols)cols.style.setProperty('grid-template-columns','repeat(5,minmax(0,1fr))','important');
+    clone.querySelectorAll('.piket-poster .day-box').forEach(box=>{box.style.setProperty('background','#2ca9a3','important');box.style.setProperty('color','#fff','important');});
+    clone.querySelectorAll('.piket-poster .day-box b').forEach(b=>b.style.setProperty('color','#fff','important'));
+    clone.querySelectorAll('.piket-poster .day-box span').forEach(sp=>sp.style.setProperty('color','#fff','important'));
   }
   if(kind==='absensi'){
     clone.style.width='900px!important';
-    clone.style.padding='20px!important';
+    clone.style.padding='16px!important';
     const cb=clone.querySelector('.chart-box');
-    if(cb){cb.style.setProperty('height','390px','important');cb.style.setProperty('max-width','700px','important');cb.style.setProperty('overflow','hidden','important');}
-    clone.querySelectorAll('table').forEach(t=>{t.style.setProperty('font-size','12px','important');t.style.setProperty('width','100%','important');});
+    if(cb){
+      cb.style.setProperty('height','270px','important');
+      cb.style.setProperty('max-width','520px','important');
+      cb.style.setProperty('margin','0 auto 12px','important');
+      cb.style.setProperty('overflow','hidden','important');
+    }
+    clone.querySelectorAll('.chart-box canvas,.chart-box img').forEach(im=>{
+      im.style.setProperty('width','100%','important');
+      im.style.setProperty('height','100%','important');
+      im.style.setProperty('object-fit','contain','important');
+    });
+    clone.querySelectorAll('table').forEach(t=>{t.style.setProperty('font-size','11px','important');t.style.setProperty('width','100%','important');t.style.setProperty('margin-top','8px','important');});
   }
   if(kind==='surat'){
     const page=clone.classList.contains('surat-page')?clone:clone.querySelector('.surat-page');
     if(page){
       page.style.setProperty('width','794px','important');
+      page.style.setProperty('height','1123px','important');
       page.style.setProperty('min-height','1123px','important');
-      page.style.setProperty('padding','48px 54px','important');
+      page.style.setProperty('padding','34px 42px 38px','important');
       page.style.setProperty('margin','0','important');
       page.style.setProperty('font-size','12.5px','important');
-      page.style.setProperty('line-height','1.5','important');
+      page.style.setProperty('line-height','1.55','important');
+      page.style.setProperty('background','#fff','important');
       const kop=page.querySelector('.kop');
-      if(kop){kop.style.setProperty('margin','0 0 22px','important');kop.style.setProperty('padding','0 0 10px','important');kop.style.setProperty('border-bottom','4px double #111','important');}
+      if(kop){kop.style.setProperty('width','100%','important');kop.style.setProperty('margin','0 0 18px','important');kop.style.setProperty('padding','0 0 8px','important');kop.style.setProperty('border-bottom','4px double #111','important');}
       const ki=page.querySelector('.kop img');
-      if(ki){ki.style.setProperty('display','block','important');ki.style.setProperty('width','100%','important');ki.style.setProperty('height','auto','important');ki.style.setProperty('max-height','none','important');}
+      if(ki){ki.style.setProperty('display','block','important');ki.style.setProperty('width','100%','important');ki.style.setProperty('height','auto','important');ki.style.setProperty('max-width','100%','important');ki.style.setProperty('max-height','none','important');ki.style.setProperty('object-fit','contain','important');}
+      const hal=page.querySelector('.hal'); if(hal){hal.style.setProperty('margin','6px 0 12px','important');}
+      page.querySelectorAll('p').forEach(p=>p.style.setProperty('margin','8px 0','important'));
+      const info=page.querySelector('.surat-info'); if(info){info.style.setProperty('margin','8px 0 12px 18px','important');}
+      const sig=page.querySelector('.sig-row'); if(sig){sig.style.setProperty('margin-top','28px','important');}
     }
   }
   if(kind==='denah'||kind==='struktur'){
@@ -811,7 +851,7 @@ async function captureNode(node,forcedWidth){
       const img=document.createElement('img');
       img.src=src.toDataURL('image/png');
       img.alt='Grafik';
-      img.style.cssText='position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important;';
+      img.style.cssText='position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important;object-fit:contain!important;';
       dst.replaceWith(img);
     }catch(e){console.warn('Canvas export failed',e);}
   });
@@ -847,7 +887,7 @@ async function exportPDF(node,name,fw){
     const cv=await captureNode(node,fw);
     const js=window.jspdf&&window.jspdf.jsPDF;if(!js)throw new Error('Library jsPDF tidak termuat.');
     const kind=exportKind(node);
-    const landscape=(kind==='poster'||kind==='piket'||kind==='kesepakatan');
+    const landscape=(kind==='piket');
     const pdf=new js(landscape?'l':'p','mm','a4');
     const pw=landscape?297:210,ph=landscape?210:297,margin=8;
     const usableW=pw-margin*2,usableH=ph-margin*2;
