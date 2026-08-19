@@ -247,28 +247,14 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
 .surat-page .surat-info{margin:7px 0 10px 18px}
 .sig-row{margin-top:18px}
 
-/* ===== V10: PIKET 5 HARI - SATU LEMBAR A4 POTRET ===== */
-.piket-poster{
-  width:794px!important; max-width:794px!important; height:1123px!important; min-height:1123px!important;
-  box-sizing:border-box!important; padding:28px 34px!important; margin-top:14px; overflow:hidden!important;
+/* ===== V9: PIKET 5 HARI DALAM 1 LEMBAR A4 POTRET ===== */
+@media screen{
+  .piket-poster{width:794px;max-width:794px;height:1123px;min-height:1123px;box-sizing:border-box}
+  .piket-poster .cols{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:repeat(5,1fr)!important;gap:8px!important;height:930px!important;overflow:visible!important}
+  .piket-poster .day-box{min-height:0!important;height:auto!important;box-sizing:border-box!important}
 }
-.piket-poster h3{font-size:24px!important;margin:0 0 5px!important;text-align:center}
-.piket-poster .pp-sub{font-size:12px!important;margin:0 0 12px!important;text-align:center}
-.piket-poster .cols{
-  display:grid!important; grid-template-columns:1fr!important; grid-template-rows:repeat(5,minmax(0,1fr))!important;
-  gap:8px!important; width:100%!important; height:1000px!important; overflow:hidden!important;
-}
-.piket-poster .day-box{
-  min-height:0!important; height:auto!important; padding:8px 14px!important;
-  box-sizing:border-box!important; overflow:hidden!important;
-}
-.piket-poster .day-box b{font-size:14px!important;margin-bottom:4px!important}
-.piket-poster .day-box span{font-size:11px!important;line-height:1.2!important;padding:1.5px 0!important}
-@media(max-width:900px){
-  .piket-poster{width:100%!important;max-width:794px!important;height:auto!important;min-height:0!important}
-  .piket-poster .cols{grid-template-columns:1fr!important;grid-template-rows:repeat(5,minmax(130px,1fr))!important;height:auto!important;overflow:visible!important}
-  .piket-poster .day-box{min-height:130px!important}
-}
+.piket-poster.export-mode .cols{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:repeat(5,1fr)!important}
+.piket-poster.export-mode .day-box{min-height:0!important;height:auto!important}
 
 @media print{
   #printRoot .surat-page{
@@ -284,6 +270,55 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
   }
   #printRoot .surat-page .kop{margin-bottom:5mm!important;padding-bottom:3mm!important}
   #printRoot .surat-page .surat-info{margin-top:4mm!important;margin-bottom:5mm!important}
+}
+
+/* ===== V11 FINAL: PIKET SATU LEMBAR A4 POTRET, 5 HARI VERTIKAL ===== */
+.piket-poster{
+  width:794px !important;
+  max-width:794px !important;
+  height:1123px !important;
+  min-height:1123px !important;
+  max-height:1123px !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+  margin:14px auto 0 !important;
+  padding:26px 34px !important;
+}
+.piket-poster h3{font-size:23px !important; margin:0 0 4px !important; text-align:center !important;}
+.piket-poster .pp-sub{font-size:11px !important; margin:0 0 12px !important; text-align:center !important;}
+.piket-poster .cols{
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  width:100% !important;
+  height:1000px !important;
+  gap:8px !important;
+  overflow:hidden !important;
+}
+.piket-poster .day-box{
+  display:block !important;
+  flex:1 1 0 !important;
+  width:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  height:auto !important;
+  box-sizing:border-box !important;
+  padding:7px 14px !important;
+  overflow:hidden !important;
+}
+.piket-poster .day-box b{
+  font-size:13px !important;
+  margin-bottom:4px !important;
+  line-height:1.1 !important;
+}
+.piket-poster .day-box span{
+  font-size:11px !important;
+  line-height:1.18 !important;
+  padding:1.5px 0 !important;
+}
+@media(max-width:900px){
+  .piket-poster{width:100% !important; max-width:794px !important; height:auto !important; min-height:1123px !important;}
+  .piket-poster .cols{display:flex !important; flex-direction:column !important; grid-template-columns:none !important; grid-template-rows:none !important; height:1000px !important;}
 }
 </style>
 </head>
@@ -863,12 +898,14 @@ async function captureNode(node,forcedWidth){
     if(sub){sub.style.setProperty('font-size','11px','important');sub.style.setProperty('margin','0 0 8px','important');}
     const cols=clone.querySelector('.cols');
     if(cols){
-      cols.style.setProperty('display','grid','important');
-      cols.style.setProperty('grid-template-columns','1fr','important');
-      cols.style.setProperty('grid-template-rows','repeat(5,1fr)','important');
+      cols.style.setProperty('display','flex','important');
+      cols.style.setProperty('flex-direction','column','important');
+      cols.style.setProperty('flex-wrap','nowrap','important');
+      cols.style.removeProperty('grid-template-columns');
+      cols.style.removeProperty('grid-template-rows');
       cols.style.setProperty('gap','7px','important');
       cols.style.setProperty('width','100%','important');
-      cols.style.setProperty('height','1000px','important');
+      cols.style.setProperty('height','930px','important');
       cols.style.setProperty('overflow','hidden','important');
     }
     clone.querySelectorAll('.piket-poster .day-box').forEach(box=>{
@@ -894,9 +931,12 @@ async function captureNode(node,forcedWidth){
       sp.style.setProperty('line-height','1.22','important');
       sp.style.setProperty('padding','1.5px 0','important');
     });
-    // Hilangkan ikon kuas/sapu dari judul maupun elemen dekoratif saat ekspor.
+    // Hilangkan ikon kuas/sapu dari seluruh hasil ekspor.
+    clone.querySelectorAll('.piket-poster *').forEach(el=>{
+      if(el.childNodes.length===1 && el.firstChild.nodeType===3 && /🧹/.test(el.textContent)) el.textContent=el.textContent.replace(/🧹/g,'');
+    });
     clone.querySelectorAll('.piket-poster').forEach(el=>{
-      el.innerHTML=el.innerHTML.replace(/🧹/g,'');
+      if(el.childNodes.length && el.firstChild.nodeType===3) el.firstChild.textContent=el.firstChild.textContent.replace(/🧹/g,'');
     });
   }
   if(kind==='absensi'){
