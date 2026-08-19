@@ -205,7 +205,16 @@ body.petugas-mode #cardInputAbsen input,body.petugas-mode #cardInputAbsen select
 .export-mode .struk-level{flex-wrap:wrap!important;overflow:visible!important;width:auto!important}
 /* PRINT */
 #printRoot{display:none}
-@media print{ body *{visibility:hidden} #printRoot,#printRoot *{visibility:visible} #printRoot{display:block;position:absolute;left:0;top:0;width:100%} }
+@page{size:A4 portrait;margin:0}
+@media print{
+  html,body{width:210mm!important;min-height:297mm!important;background:#fff!important}
+  body *{visibility:hidden!important}
+  #printRoot,#printRoot *{visibility:visible!important}
+  #printRoot{display:block!important;position:absolute!important;left:0!important;top:0!important;width:210mm!important;min-height:297mm!important;background:#fff!important}
+  #printRoot .surat-page{width:210mm!important;min-height:297mm!important;max-width:none!important;margin:0!important;padding:15mm 17mm!important;border:0!important;box-shadow:none!important;border-radius:0!important;font-size:11.5pt!important;line-height:1.5!important}
+  #printRoot .kop{margin:0 0 6mm!important;padding:0 0 3mm!important}
+  #printRoot .kop img{width:100%!important;height:auto!important;max-height:none!important}
+}
 .foot{text-align:center;color:var(--mut);font-size:12px;font-weight:600;margin-top:30px}
 @media(max-width:640px){#suratPreview{overflow-x:auto;padding-bottom:8px}.surat-page{margin-left:0;margin-right:0}.hdr h1{font-size:19px}.role-box{margin-left:0;text-align:left}.meja-guru{position:static;writing-mode:horizontal-tb;width:100%;margin-top:14px;padding:8px}.seat-grid{margin-right:0}}
 </style>
@@ -694,28 +703,96 @@ function studentOptions(sel){return '<option value="">— pilih siswa —</optio
 function compressImage(file,max){return new Promise(res=>{const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');const r=Math.min(1,(max||260)/Math.max(img.width,img.height));c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.85));};img.src=e.target.result;};rd.readAsDataURL(file);});}
 
 /* ================= EXPORT ================= */
+async function waitForImages(root){
+  const imgs=[...root.querySelectorAll('img')];
+  await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{
+    img.addEventListener('load',res,{once:true});
+    img.addEventListener('error',res,{once:true});
+  })));
+}
 async function nodeToCanvas(node,forcedWidth){
   const clone=node.cloneNode(true);
   clone.classList.add('export-mode');
   clone.style.position='fixed';
-  clone.style.left='-99999px';
+  clone.style.left='0';
   clone.style.top='0';
-  clone.style.width=(forcedWidth||900)+'px';
+  clone.style.width=(forcedWidth||794)+'px';
   clone.style.maxWidth='none';
   clone.style.height='auto';
-  clone.style.zIndex='-1';
+  clone.style.opacity='0';
+  clone.style.pointerEvents='none';
+  clone.style.zIndex='-9999';
+  clone.style.background='#fff';
   document.body.appendChild(clone);
-  await new Promise(r=>setTimeout(r,60));
-  let cv;
+
+  // Chart.js draws into <canvas>; cloning the DOM alone produces a blank canvas.
+  // Copy each original canvas bitmap into its matching cloned canvas.
+  const sourceCanvases=[...node.querySelectorAll('canvas')];
+  const clonedCanvases=[...clone.querySelectorAll('canvas')];
+  sourceCanvases.forEach((src,i)=>{
+    const dst=clonedCanvases[i];
+    if(!dst)return;
+    const w=src.width,h=src.height;
+    dst.width=w; dst.height=h;
+    const ctx=dst.getContext('2d');
+    if(ctx)ctx.drawImage(src,0,0,w,h);
+  });
+
+  await waitForImages(clone);
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+
   try{
-    cv=await html2canvas(clone,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:forcedWidth||900});
+    return await html2canvas(clone,{
+      scale:2,
+      backgroundColor:'#ffffff',
+      useCORS:true,
+      allowTaint:true,
+      logging:false,
+      windowWidth:forcedWidth||794,
+      scrollX:0,
+      scrollY:0
+    });
   }finally{
     document.body.removeChild(clone);
   }
-  return cv;
 }
-async function exportJPEG(node,name,fw){if(!node){toast('Belum ada konten untuk diunduh','warn');return;}showOverlay('Menyiapkan dokumen…');try{const cv=await nodeToCanvas(node,fw);const a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.93);a.download=name;a.click();toast('✅ JPEG berhasil diunduh','ok');}catch(e){toast('❌ Gagal membuat JPEG','err');}hideOverlay();}
-async function exportPDF(node,name,fw){if(!node){toast('Belum ada konten untuk diunduh','warn');return;}showOverlay('Menyiapkan dokumen…');try{const cv=await nodeToCanvas(node,fw);const{jsPDF}=window.jspdf;const landscape=cv.width>cv.height;const pdf=new jsPDF(landscape?'l':'p','mm','a4');const pw=landscape?297:210,ph=landscape?210:297,m=8;const ratio=cv.height/cv.width;let w=pw-2*m,h=w*ratio;if(h>ph-2*m){h=ph-2*m;w=h/ratio;}pdf.addImage(cv.toDataURL('image/jpeg',.93),'JPEG',(pw-w)/2,(ph-h)/2,w,h);pdf.save(name);toast('✅ PDF berhasil diunduh','ok');}catch(e){toast('❌ Gagal membuat PDF','err');}hideOverlay();}
+async function exportJPEG(node,name,fw){
+  if(!node){toast('Belum ada konten untuk diunduh','warn');return;}
+  showOverlay('Menyiapkan dokumen…');
+  try{
+    const cv=await nodeToCanvas(node,fw);
+    const a=document.createElement('a');
+    a.href=cv.toDataURL('image/jpeg',.95);
+    a.download=name;
+    a.click();
+    toast('✅ JPEG berhasil diunduh','ok');
+  }catch(e){
+    console.error(e);
+    toast('❌ Gagal membuat JPEG','err');
+  }finally{hideOverlay();}
+}
+async function exportPDF(node,name,fw){
+  if(!node){toast('Belum ada konten untuk diunduh','warn');return;}
+  showOverlay('Menyiapkan PDF A4 potret…');
+  try{
+    const cv=await nodeToCanvas(node,fw);
+    const{jsPDF}=window.jspdf;
+    if(!jsPDF)throw new Error('jsPDF tidak tersedia');
+    const pdf=new jsPDF('p','mm','a4');
+    const pw=210,ph=297,m=8;
+    const maxW=pw-2*m,maxH=ph-2*m;
+    const ratio=cv.height/cv.width;
+    let w=maxW,h=w*ratio;
+    if(h>maxH){h=maxH;w=h/ratio;}
+    const x=(pw-w)/2,y=(ph-h)/2;
+    pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',x,y,w,h,undefined,'FAST');
+    pdf.save(name);
+    toast('✅ PDF A4 potret berhasil diunduh','ok');
+  }catch(e){
+    console.error(e);
+    toast('❌ Gagal membuat PDF — coba ulangi setelah pratinjau tampil','err');
+  }finally{hideOverlay();}
+}
 
 /* ================= TABS ================= */
 document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
@@ -1222,8 +1299,13 @@ function hapusPengumuman(id){
   save();renderPengumuman();
   toast('🗑 Pengumuman dihapus','ok');
 }
-function cetakSurat(){if(!guard())return;if(!$('suratPreview').innerHTML){toast('Klik 👁 Pratinjau terlebih dahulu','warn');return;}
-  $('printRoot').innerHTML=$('suratPreview').innerHTML;window.print();setTimeout(()=>$('printRoot').innerHTML='',800);}
+function cetakSurat(){
+  if(!guard())return;
+  if(!$('suratPreview').innerHTML){toast('Klik 👁 Pratinjau terlebih dahulu','warn');return;}
+  $('printRoot').innerHTML=$('suratPreview').innerHTML;
+  requestAnimationFrame(()=>window.print());
+  setTimeout(()=>$('printRoot').innerHTML='',1500);
+}
 
 /* ================= MODAL ================= */
 function openModal(html){$('modalBody').innerHTML=html;$('modal').style.display='flex';}
