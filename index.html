@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manajemen Kelas 8E — SMP Negeri 15 Balikpapan</title>
+<title>Manajemen Kelas 8E — SMP Negeri 15 Balikpapan — Piket A4 v2</title>
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-400.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-600.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.0.20/latin-700.css" rel="stylesheet">
@@ -714,37 +714,101 @@ async function nodeToCanvas(node,forcedWidth){
 }
 async function exportPiketA4(format){
   if(!state || !state.piketHari) return;
-  showOverlay('Menyiapkan Jadwal Piket A4…');
-  const wrap=document.createElement('div');
-  wrap.style.cssText='position:fixed;left:-100000px;top:0;width:794px;height:1123px;background:#fff;box-sizing:border-box;padding:42px 46px;font-family:Arial,sans-serif;color:#0f172a;z-index:-9999;';
-  const title=document.createElement('div');
-  title.innerHTML='<div style="text-align:center;font-size:28px;font-weight:800;letter-spacing:.2px;color:#0f766e;line-height:1.2">JADWAL PIKET KELAS '+esc(state.namaKelas||'8E')+'</div><div style="text-align:center;font-size:15px;font-weight:600;color:#475569;margin-top:7px">SMP Negeri 15 Balikpapan</div><div style="text-align:center;font-size:12px;color:#64748b;margin-top:3px">Tahun Pelajaran 2026/2027 • Wali Kelas: Eko Dainur Utomo Pasi, S.Pd.</div><div style="height:2px;background:#0f766e;margin:18px 0 16px"></div>';
-  wrap.appendChild(title);
-  const days=document.createElement('div');
-  days.style.cssText='display:flex;flex-direction:column;gap:10px;';
-  const daysData=state.piketHari||['Senin','Selasa','Rabu','Kamis','Jumat'];
-  daysData.forEach((h,i)=>{
-    const box=document.createElement('div');
-    box.style.cssText='background:linear-gradient(135deg,#0f9f95,#0e8f87);border-radius:12px;padding:11px 16px 12px;color:#fff;box-sizing:border-box;min-height:170px;';
+  showOverlay('Menyiapkan Jadwal Piket A4 Potret…');
+
+  // Buat kanvas ekspor sendiri. Tidak memakai layout poster di halaman,
+  // sehingga ukuran A4 selalu PORTRAIT dan tidak bisa melebar ke landscape.
+  const W=794, H=1123, M=48;
+  const cv=document.createElement('canvas');
+  cv.width=W*2; cv.height=H*2;
+  const ctx=cv.getContext('2d');
+  ctx.scale(2,2);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+  const teal='#0f9488', tealDark='#0f766e', ink='#0f172a', muted='#64748b';
+  const days=(state.piketHari||['Senin','Selasa','Rabu','Kamis','Jumat']).slice(0,5);
+
+  // Judul dokumen — sengaja dibuat teks biasa agar selalu ikut PDF/JPEG.
+  ctx.textAlign='center';
+  ctx.fillStyle=ink;
+  ctx.font='800 27px Arial';
+  ctx.fillText('JADWAL PIKET KELAS '+(state.namaKelas||'8E'),W/2,58);
+  ctx.fillStyle=tealDark;
+  ctx.font='700 16px Arial';
+  ctx.fillText('SMP NEGERI 15 BALIKPAPAN',W/2,84);
+  ctx.fillStyle=muted;
+  ctx.font='12px Arial';
+  ctx.fillText('Tahun Pelajaran 2026/2027  •  Wali Kelas: Eko Dainur Utomo Pasi, S.Pd.',W/2,105);
+  ctx.strokeStyle=tealDark; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(M,123); ctx.lineTo(W-M,123); ctx.stroke();
+
+  const gap=10;
+  const top=142;
+  const bottom=H-55;
+  const boxH=(bottom-top-gap*4)/5;
+  const boxW=W-M*2;
+
+  days.forEach((h,i)=>{
+    const y=top+i*(boxH+gap);
+    // kartu
+    ctx.fillStyle='#2eaaa5';
+    roundRect(ctx,M,y,boxW,boxH,12); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1;
+    roundRect(ctx,M,y,boxW,boxH,12); ctx.stroke();
+
+    ctx.textAlign='center'; ctx.fillStyle='#ffffff';
+    ctx.font='800 16px Arial';
+    ctx.fillText(String(h).toUpperCase(),W/2,y+25);
+
     const names=(state.piketList[i]||[]).map(id=>murid(id)).filter(Boolean);
-    box.innerHTML='<div style="text-align:center;font-size:16px;font-weight:800;letter-spacing:1.2px;margin-bottom:8px">'+esc(h.toUpperCase())+'</div>'+
-      (names.length?names.map(st=>'<div style="font-size:12.5px;font-weight:600;line-height:1.35;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.28)">'+esc(st.nama)+'</div>').join(''):'<div style="font-size:12px;text-align:center;opacity:.85;padding:8px">Belum ada petugas piket</div>');
-    days.appendChild(box);
-  });
-  wrap.appendChild(days);
-  const foot=document.createElement('div');
-  foot.innerHTML='<div style="text-align:center;font-size:11px;color:#64748b;margin-top:16px">Jadwal piket 5 hari sekolah • Senin–Jumat</div>';
-  wrap.appendChild(foot);
-  document.body.appendChild(wrap);
-  try{
-    const cv=await html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:794,height:1123,windowWidth:794,windowHeight:1123});
-    if(format==='jpeg'){
-      const a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.95);a.download='Jadwal-Piket-'+(state.namaKelas||'8E')+'.jpeg';a.click();toast('✅ JPEG Jadwal Piket A4 berhasil diunduh','ok');
+    ctx.textAlign='left';
+    const startY=y+48;
+    const lineH=Math.min(22,(boxH-62)/Math.max(names.length||1,1));
+    ctx.font='600 12.5px Arial';
+    if(!names.length){
+      ctx.textAlign='center'; ctx.globalAlpha=.85;
+      ctx.fillText('Belum ada petugas piket',W/2,y+boxH/2+4); ctx.globalAlpha=1;
     }else{
-      const {jsPDF}=window.jspdf;const pdf=new jsPDF('p','mm','a4');pdf.addImage(cv.toDataURL('image/jpeg',.95),'JPEG',0,0,210,297);pdf.save('Jadwal-Piket-'+(state.namaKelas||'8E')+'.pdf');toast('✅ PDF Jadwal Piket A4 berhasil diunduh','ok');
+      names.forEach((st,j)=>{
+        const yy=startY+j*lineH;
+        ctx.fillStyle='#ffffff'; ctx.fillText(st.nama,M+18,yy);
+        if(j<names.length-1){
+          ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(M+18,yy+6);ctx.lineTo(W-M-18,yy+6);ctx.stroke();
+        }
+      });
     }
-  }catch(e){console.error(e);toast('❌ Gagal membuat Jadwal Piket A4','err');}
-  finally{wrap.remove();hideOverlay();}
+  });
+
+  ctx.textAlign='center'; ctx.fillStyle=muted; ctx.font='11px Arial';
+  ctx.fillText('Jadwal piket 5 hari sekolah • Senin–Jumat',W/2,H-24);
+
+  try{
+    const data=cv.toDataURL('image/jpeg',.95);
+    if(format==='jpeg'){
+      const a=document.createElement('a');
+      a.href=data; a.download='Jadwal-Piket-'+(state.namaKelas||'8E')+'.jpeg';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('✅ JPEG Jadwal Piket A4 potret berhasil diunduh','ok');
+    }else{
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+      pdf.addImage(data,'JPEG',0,0,210,297,undefined,'FAST');
+      pdf.save('Jadwal-Piket-'+(state.namaKelas||'8E')+'.pdf');
+      toast('✅ PDF Jadwal Piket A4 potret berhasil diunduh','ok');
+    }
+  }catch(e){
+    console.error(e); toast('❌ Gagal membuat Jadwal Piket A4: '+(e.message||e),'err');
+  }finally{ hideOverlay(); }
+
+  function roundRect(c,x,y,w,h,r){
+    const rr=Math.min(r,w/2,h/2);
+    c.beginPath(); c.moveTo(x+rr,y); c.lineTo(x+w-rr,y);
+    c.quadraticCurveTo(x+w,y,x+w,y+rr); c.lineTo(x+w,y+h-rr);
+    c.quadraticCurveTo(x+w,y+h,x+w-rr,y+h); c.lineTo(x+rr,y+h);
+    c.quadraticCurveTo(x,y+h,x,y+h-rr); c.lineTo(x,y+rr);
+    c.quadraticCurveTo(x,y,x+rr,y); c.closePath();
+  }
 }
 async function exportJPEG(node,name,fw){if(!node){toast('Belum ada konten untuk diunduh','warn');return;}showOverlay('Menyiapkan dokumen…');try{const cv=await nodeToCanvas(node,fw);const a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.93);a.download=name;a.click();toast('✅ JPEG berhasil diunduh','ok');}catch(e){toast('❌ Gagal membuat JPEG','err');}hideOverlay();}
 async function exportPDF(node,name,fw){if(!node){toast('Belum ada konten untuk diunduh','warn');return;}showOverlay('Menyiapkan dokumen…');try{const cv=await nodeToCanvas(node,fw);const{jsPDF}=window.jspdf;const landscape=cv.width>cv.height;const pdf=new jsPDF(landscape?'l':'p','mm','a4');const pw=landscape?297:210,ph=landscape?210:297,m=8;const ratio=cv.height/cv.width;let w=pw-2*m,h=w*ratio;if(h>ph-2*m){h=ph-2*m;w=h/ratio;}pdf.addImage(cv.toDataURL('image/jpeg',.93),'JPEG',(pw-w)/2,(ph-h)/2,w,h);pdf.save(name);toast('✅ PDF berhasil diunduh','ok');}catch(e){toast('❌ Gagal membuat PDF','err');}hideOverlay();}
