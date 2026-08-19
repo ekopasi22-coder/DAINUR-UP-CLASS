@@ -889,13 +889,9 @@ async function captureNode(node,forcedWidth){
       pp.style.setProperty('overflow','hidden','important');
     }
     const title=clone.querySelector('.piket-poster h3');
-    if(title){
-      title.textContent='JADWAL PIKET KELAS '+((state.namaKelas||'').toUpperCase());
-      title.style.setProperty('font-size','22px','important');
-      title.style.setProperty('margin','0 0 4px','important');
-    }
+    if(title){title.style.setProperty('display','none','important');}
     const sub=clone.querySelector('.piket-poster .pp-sub');
-    if(sub){sub.style.setProperty('font-size','11px','important');sub.style.setProperty('margin','0 0 8px','important');}
+    if(sub){sub.style.setProperty('display','none','important');}
     const cols=clone.querySelector('.cols');
     if(cols){
       cols.style.setProperty('display','flex','important');
@@ -903,10 +899,19 @@ async function captureNode(node,forcedWidth){
       cols.style.setProperty('flex-wrap','nowrap','important');
       cols.style.removeProperty('grid-template-columns');
       cols.style.removeProperty('grid-template-rows');
-      cols.style.setProperty('gap','7px','important');
+      cols.style.setProperty('gap','6px','important');
       cols.style.setProperty('width','100%','important');
-      cols.style.setProperty('height','930px','important');
+      cols.style.setProperty('height','935px','important');
       cols.style.setProperty('overflow','hidden','important');
+
+      // Header ekspor dibuat langsung di dalam area yang ditangkap,
+      // sehingga judul pasti ikut tercetak.
+      const exportHead=document.createElement('div');
+      exportHead.style.cssText='display:block!important;text-align:center!important;color:#fff!important;margin:0 0 10px!important;padding:0!important;line-height:1.2!important;';
+      exportHead.innerHTML='<div style="font-size:22px;font-weight:800;letter-spacing:.5px;">JADWAL PIKET KELAS '+String(state.namaKelas||'').toUpperCase()+'</div>'+
+        '<div style="font-size:11px;font-weight:600;margin-top:4px;opacity:.95;">SMP Negeri 15 Balikpapan • Tahun Pelajaran 2026/2027</div>'+
+        '<div style="font-size:10px;font-weight:600;margin-top:2px;opacity:.9;">Wali Kelas: Eko Dainur Utomo Pasi, S.Pd.</div>';
+      cols.insertBefore(exportHead,cols.firstChild);
     }
     clone.querySelectorAll('.piket-poster .day-box').forEach(box=>{
       box.style.setProperty('min-height','0','important');
@@ -931,13 +936,11 @@ async function captureNode(node,forcedWidth){
       sp.style.setProperty('line-height','1.22','important');
       sp.style.setProperty('padding','1.5px 0','important');
     });
-    // Hilangkan ikon kuas/sapu dari seluruh hasil ekspor.
-    clone.querySelectorAll('.piket-poster *').forEach(el=>{
-      if(el.childNodes.length===1 && el.firstChild.nodeType===3 && /🧹/.test(el.textContent)) el.textContent=el.textContent.replace(/🧹/g,'');
-    });
-    clone.querySelectorAll('.piket-poster').forEach(el=>{
-      if(el.childNodes.length && el.firstChild.nodeType===3) el.firstChild.textContent=el.firstChild.textContent.replace(/🧹/g,'');
-    });
+    // Hilangkan ikon kuas/sapu dari seluruh hasil ekspor piket.
+    const walker=document.createTreeWalker(clone,NodeFilter.SHOW_TEXT);
+    const textNodes=[];
+    while(walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach(n=>{n.nodeValue=n.nodeValue.replace(/🧹/g,'');});
   }
   if(kind==='absensi'){
     clone.style.width='900px!important';
