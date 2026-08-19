@@ -710,109 +710,118 @@ function compressImage(file,max){return new Promise(res=>{const rd=new FileReade
 function waitForImages(root){
   const imgs=[...root.querySelectorAll('img')];
   return Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{
-    img.addEventListener('load',res,{once:true}); img.addEventListener('error',res,{once:true});
+    img.addEventListener('load',res,{once:true});
+    img.addEventListener('error',res,{once:true});
   })));
 }
 function nextPaint(){return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
 
 /*
-  EXPORT ENGINE v2
-  Jangan menggandakan node ke posisi off-screen. Chrome Android + html2canvas
-  dapat menghasilkan canvas putih untuk elemen off-screen. Kita tangkap node asli
-  yang sedang tampil, sementara ukurannya diubah ke kanvas A4, lalu semua style
-  dikembalikan seperti semula.
+  EXPORT ENGINE v4
+  The export target is cloned into a VISIBLE capture surface at the top-left of
+  the document. The overlay hides that surface from the user while html2canvas
+  renders it. This avoids the blank-canvas problem caused by hidden/off-screen
+  nodes on Chrome Android.
 */
 async function captureNode(node,forcedWidth){
   if(!node) throw new Error('Elemen ekspor tidak ditemukan');
-  if(typeof html2canvas!=='function') throw new Error('html2canvas belum termuat');
+  if(typeof html2canvas!=='function') throw new Error('Library html2canvas tidak termuat. Muat ulang halaman.');
 
   const width=forcedWidth||794;
-  const old={
-    position:node.style.position, left:node.style.left, top:node.style.top,
-    width:node.style.width, maxWidth:node.style.maxWidth, minHeight:node.style.minHeight,
-    height:node.style.height, margin:node.style.margin, padding:node.style.padding,
-    border:node.style.border, borderRadius:node.style.borderRadius,
-    boxShadow:node.style.boxShadow, background:node.style.background,
-    opacity:node.style.opacity, visibility:node.style.visibility,
-    zIndex:node.style.zIndex, overflow:node.style.overflow
-  };
-  const oldBodyOverflow=document.body.style.overflow;
-  const hidden=[];
-  node.querySelectorAll('.no-export').forEach(el=>{
-    hidden.push([el,el.style.display]); el.style.display='none';
-  });
+  const section=node.closest('section.tab');
+  const wasActive=section?section.classList.contains('active'):true;
+  if(section && !wasActive) section.classList.add('active');
 
-  node.classList.add('export-mode');
-  node.style.position='fixed';
-  node.style.left='0px';
-  node.style.top='0px';
-  node.style.width=width+'px';
-  node.style.maxWidth='none';
-  node.style.height='auto';
-  node.style.minHeight='0';
-  node.style.margin='0';
-  node.style.borderRadius='0';
-  node.style.boxShadow='none';
-  node.style.background='#fff';
-  node.style.opacity='1';
-  node.style.visibility='visible';
-  node.style.zIndex='50000';
-  node.style.overflow='visible';
-  document.body.style.overflow='hidden';
+  const host=document.createElement('div');
+  host.id='__capture_host__';
+  host.style.cssText='position:absolute;left:0;top:0;width:'+width+'px;min-height:1px;display:block;visibility:visible;opacity:1;background:#fff;z-index:100;pointer-events:none;overflow:visible;';
+  document.body.appendChild(host);
 
-  // Surat harus selalu A4 portrait dan kop memenuhi lebar area surat.
+  const clone=node.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.cssText+=';display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;left:0!important;top:0!important;width:'+width+'px!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;background:#fff!important;box-shadow:none!important;overflow:visible!important;';
+  clone.classList.add('export-mode');
+
+  // Remove interactive/export-only controls.
+  clone.querySelectorAll('.no-export,button,input[type=file]').forEach(el=>el.remove());
+
+  // A4 portrait letter page.
   if(node.classList.contains('surat-page')){
-    node.style.width='794px';
-    node.style.minHeight='1123px';
-    node.style.padding='57px 64px';
-    const kop=node.querySelector('.kop');
+    clone.style.width='794px';
+    clone.style.minHeight='1123px';
+    clone.style.padding='57px 64px';
+    const kop=clone.querySelector('.kop');
     if(kop){kop.style.margin='0 0 22px';kop.style.padding='0 0 10px';}
-    const ki=node.querySelector('.kop img');
+    const ki=clone.querySelector('.kop img');
     if(ki){ki.style.display='block';ki.style.width='100%';ki.style.height='auto';ki.style.maxHeight='none';}
   }
 
-  // Canvas Chart.js tetap memakai canvas asli; html2canvas bisa menangkapnya
-  // karena elemen sekarang berada di viewport.
-  await waitForImages(node);
+  host.appendChild(clone);
+
+  // Copy Chart.js canvas pixels into cloned canvases. html2canvas then sees the
+  // actual graph instead of an empty newly-created canvas.
+  const sourceCanvases=[...node.querySelectorAll('canvas')];
+  const clonedCanvases=[...clone.querySelectorAll('canvas')];
+  sourceCanvases.forEach((src,i)=>{
+    const dst=clonedCanvases[i];
+    if(!dst)return;
+    try{
+      dst.width=src.width; dst.height=src.height;
+      const ctx=dst.getContext('2d');
+      if(ctx)ctx.drawImage(src,0,0,src.width,src.height);
+    }catch(e){console.warn('Canvas copy failed',e);}
+  });
+
+  // Replace cloned canvas with bitmap images as an additional safeguard.
+  [...clone.querySelectorAll('canvas')].forEach(c=>{
+    try{
+      const img=document.createElement('img');
+      img.src=c.toDataURL('image/png');
+      img.style.cssText='display:block;width:100%;height:auto;max-width:100%;';
+      c.replaceWith(img);
+    }catch(e){}
+  });
+
+  await waitForImages(clone);
   await nextPaint();
+
   let cv;
   try{
-    cv=await html2canvas(node,{
+    const rect=clone.getBoundingClientRect();
+    const h=Math.max(clone.scrollHeight,Math.ceil(rect.height),1);
+    cv=await html2canvas(clone,{
       scale:2,
       backgroundColor:'#ffffff',
       useCORS:true,
       allowTaint:true,
       logging:false,
-      width:node.getBoundingClientRect().width,
-      height:node.scrollHeight,
-      windowWidth:Math.max(window.innerWidth,width),
-      windowHeight:Math.max(window.innerHeight,node.scrollHeight),
+      x:0,y:0,
+      width:width,
+      height:h,
+      windowWidth:Math.max(document.documentElement.clientWidth,width),
+      windowHeight:Math.max(window.innerHeight,h),
       scrollX:0,scrollY:0,
-      onclone:function(doc){
-        const el=doc.querySelector('#'+node.id);
-        if(el){el.style.visibility='visible';el.style.opacity='1';}
-      }
+      removeContainer:true
     });
+    if(!cv || !cv.width || !cv.height) throw new Error('Hasil tangkapan kosong (ukuran canvas 0).');
   }finally{
-    node.classList.remove('export-mode');
-    Object.entries(old).forEach(([k,v])=>node.style[k]=v);
-    hidden.forEach(([el,v])=>el.style.display=v);
-    document.body.style.overflow=oldBodyOverflow;
+    host.remove();
+    if(section && !wasActive) section.classList.remove('active');
   }
   return cv;
 }
 
 async function exportJPEG(node,name,fw){
   if(!node){toast('Belum ada konten untuk diunduh','warn');return;}
-  showOverlay('Menyiapkan JPEG…');
+  showOverlay('Menyiapkan JPG…');
   try{
     const cv=await captureNode(node,fw||794);
     const a=document.createElement('a');
     a.href=cv.toDataURL('image/jpeg',.95);
     a.download=name;
     document.body.appendChild(a);a.click();a.remove();
-    toast('✅ JPEG berhasil diunduh','ok');
-  }catch(e){console.error(e);toast('❌ JPEG gagal dibuat: '+e.message,'err');}
+    toast('✅ JPG berhasil diunduh','ok');
+  }catch(e){console.error(e);toast('❌ JPG gagal: '+e.message,'err');}
   finally{hideOverlay();}
 }
 
@@ -822,26 +831,29 @@ async function exportPDF(node,name,fw){
   try{
     const cv=await captureNode(node,fw||794);
     const js=window.jspdf&&window.jspdf.jsPDF;
-    if(!js)throw new Error('jsPDF belum termuat');
+    if(!js)throw new Error('Library jsPDF tidak termuat. Muat ulang halaman.');
     const pdf=new js('p','mm','a4');
     const pageW=210,pageH=297;
+    // Keep A4 portrait and paginate long reports without shrinking them into a tiny page.
     const pxPerPage=cv.width*(pageH/pageW);
     let offset=0,page=0;
     while(offset<cv.height-1){
       const sliceH=Math.min(pxPerPage,cv.height-offset);
       const slice=document.createElement('canvas');
-      slice.width=cv.width;slice.height=Math.ceil(sliceH);
+      slice.width=cv.width;
+      slice.height=Math.max(1,Math.ceil(sliceH));
       const ctx=slice.getContext('2d');
       ctx.fillStyle='#fff';ctx.fillRect(0,0,slice.width,slice.height);
-      ctx.drawImage(cv,0,offset,cv.width,sliceH,0,0,cv.width,sliceH);
+      ctx.drawImage(cv,0,offset,cv.width,sliceH,0,0,cv.width,slice.height);
       if(page>0)pdf.addPage('a4','p');
       const h=pageW*(slice.height/slice.width);
       pdf.addImage(slice.toDataURL('image/jpeg',.97),'JPEG',0,0,pageW,h,undefined,'FAST');
       offset+=sliceH;page++;
     }
+    if(page===0)throw new Error('Tidak ada isi yang dapat diekspor.');
     pdf.save(name);
-    toast('✅ PDF A4 potret berhasil diunduh'+(page>1?' ('+page+' halaman)':''),'ok');
-  }catch(e){console.error(e);toast('❌ PDF gagal dibuat: '+e.message,'err');}
+    toast('✅ PDF A4 berhasil diunduh'+(page>1?' ('+page+' halaman)':''),'ok');
+  }catch(e){console.error(e);toast('❌ PDF gagal: '+e.message,'err');}
   finally{hideOverlay();}
 }
 
