@@ -734,30 +734,33 @@ function setRole(r){
   toast(r==='admin'?'🔓 Mode Wali Kelas (Admin) — akses penuh':r==='petugas'?'🧒 Mode Petugas Absensi — hanya bisa input absen':r==='ortu'?'👨‍👩‍👧 Mode Orang Tua/Wali — hanya melihat':'🎓 Mode Siswa — hanya melihat','ok');
 }
 function applyRole(){
-  const r=state.role;document.body.classList.toggle('readonly',r!=='admin');
+  const r=state.role;
+  document.body.classList.toggle('readonly',r!=='admin');
   document.body.classList.toggle('petugas-mode',r==='petugas');
-  $('roleSelect').value=r;
-  $('roleSelectWrap').style.display=isRealAdmin?'':'none';
-  $('kelasFldWrap').style.display=r==='admin'?'':'none';
+  const roleSelect=$('roleSelect'), roleWrap=$('roleSelectWrap'), kelasWrap=$('kelasFldWrap');
+  if(roleSelect)roleSelect.value=r;
+  if(roleWrap)roleWrap.style.display=isRealAdmin?'':'none';
+  if(kelasWrap)kelasWrap.style.display=r==='admin'?'':'none';
   if(typeof renderLinkAbsen==='function')renderLinkAbsen();
   if(typeof renderPengumuman==='function')renderPengumuman();
   const allowed=TAB_AKSES[r]||TAB_AKSES.siswa;
   document.querySelectorAll('.tab-btn').forEach(b=>{b.style.display=allowed.includes(b.dataset.tab)?'':'none';});
   const activeBtn=document.querySelector('.tab-btn.active');
   if(!activeBtn||activeBtn.style.display==='none')showTab(allowed[0]);
-  const pw=$('petugasPickerWrap');
+  const pw=$('petugasPickerWrap'), pwSel=$('petugasSiswaSelect');
   if(r==='petugas'&&isRealAdmin){
-    pw.style.display='';
-    $('petugasSiswaSelect').innerHTML='<option value="">— pilih nama kamu —</option>'+state.petugasAbsensi.map(id=>{const s=murid(id);return s?'<option value="'+id+'"'+(id===state.petugasAktif?' selected':'')+'>'+esc(s.nama)+'</option>':'';}).join('');
-  }else{pw.style.display='none';}
-  const bn=$('roleBanner');
-  if(r==='admin'){$('roleBadge').textContent='🔓 Admin';bn.style.display='none';}
+    if(pw)pw.style.display='';
+    if(pwSel)pwSel.innerHTML='<option value="">— pilih nama kamu —</option>'+state.petugasAbsensi.map(id=>{const s=murid(id);return s?'<option value="'+id+'"'+(id===state.petugasAktif?' selected':'')+'>'+esc(s.nama)+'</option>':'';}).join('');
+  }else if(pw){pw.style.display='none';}
+  const bn=$('roleBanner'), rb=$('roleBadge');
+  if(!bn||!rb)return;
+  if(r==='admin'){rb.textContent='🔓 Admin';bn.style.display='none';}
   else if(r==='petugas'){
-    $('roleBadge').textContent='🧒 Petugas Absensi'+(myDisplayName?(' — '+myDisplayName):'');
+    rb.textContent='🧒 Petugas Absensi'+(myDisplayName?(' — '+myDisplayName):'');
     bn.style.display='block';
     bn.innerHTML='🧒 <b>Mode Petugas Absensi</b> — hanya menu <b>📊 Absensi</b> yang bisa dibuka, dan hanya bagian <b>Input Absensi Manual</b> yang bisa diisi. Menu lain tidak ditampilkan.';
   }else{
-    $('roleBadge').textContent=(r==='ortu'?'👁 Mode Lihat (Orang Tua)':'👁 Mode Lihat (Siswa)')+(myDisplayName?(' — '+myDisplayName):'');
+    rb.textContent=(r==='ortu'?'👁 Mode Lihat (Orang Tua)':'👁 Mode Lihat (Siswa)')+(myDisplayName?(' — '+myDisplayName):'');
     bn.style.display='block';
     bn.innerHTML=(r==='ortu'?'👨‍👩‍👧 <b>Mode Orang Tua/Wali</b>':'🎓 <b>Mode Siswa</b>')+' — jadwal, absensi, denah, piket, data siswa & struktur organisasi dapat dilihat namun <b>tidak dapat diubah</b>. (Fitur ini menjadi dasar versi online yang dapat diakses wali murid & siswa)';
   }
@@ -766,7 +769,7 @@ function applyRole(){
 function renderNamaKelas(){
   const n=esc(state.namaKelas);
   ['hNamaKelas1','hNamaKelas2','hNamaKelas3','hNamaKelas4','hNamaKelasPiket','hNamaKelasStruk','hNamaKelasAbsen','hNamaKelasFoot'].forEach(id=>{const el=$(id);if(el)el.textContent=state.namaKelas;});
-  $('namaKelasInput').value=state.namaKelas;
+  const namaInput=$('namaKelasInput');if(namaInput)namaInput.value=state.namaKelas;
   document.title='Manajemen Kelas '+state.namaKelas+' — SMP Negeri 15 Balikpapan';
 }
 function ubahNamaKelas(v){if(!guard())return;state.namaKelas=v.trim()||'8E';save();renderNamaKelas();renderKesepakatan();renderPiket();renderStruktur();renderChartAbsen();}
@@ -839,7 +842,7 @@ async function generateOcr(){
 }
 
 /* ================= KESEPAKATAN ================= */
-function renderKesepakatan(){$('kesepakatanText').value=state.kesepakatan.join('\n');renderPoster();}
+function renderKesepakatan(){const el=$('kesepakatanText');if(el)el.value=state.kesepakatan.join('\n');renderPoster();}
 function renderPoster(){
   if(!$('posterArea'))return;
   $('posterArea').innerHTML='<div class="poster"><h3>🤝 KESEPAKATAN KELAS '+esc(state.namaKelas)+'</h3><div class="ps">SMP Negeri 15 Balikpapan — Tahun Pelajaran 2026/2027</div><ol>'+
@@ -867,6 +870,7 @@ function seatHTML(idx){
 }
 function renderDenah(){
   const d=state.denah,total=d.baris*d.kolom,host=$('denahRender');
+  if(!host)return;
   if(d.bentuk==='kelompok'){
     let html='<div class="seat-grid pods">',pod=[];
     for(let i=0;i<total;i++){pod.push(seatHTML(i));if(pod.length===4||i===total-1){html+='<div class="pod">'+pod.join('')+'</div>';pod=[];}}
@@ -1021,6 +1025,8 @@ function getFilteredCounts(){
   return {c,fallback:false};
 }
 function renderChartAbsen(){
+  if(!$('reportSub')||!$('chartNote')||!$('chartType')||!$('absenChart'))return;
+  if(typeof Chart==='undefined')return;
   const f=getFilter();$('reportSub').textContent=filterLabel(f)+' • Wali Kelas: Eko Dainur Utomo Pasi, S.Pd.';
   const g=getFilteredCounts();
   $('chartNote').textContent=g.fallback?'(Belum ada input manual pada filter ini — grafik menampilkan total rekap keseluruhan)':'';
@@ -1333,14 +1339,18 @@ async function loginAdmin(){
   lgLoading(true);
   try{
     await fbAuth.signInWithEmailAndPassword(ADMIN_EMAIL,pass);
-    isRealAdmin=true;myDisplayName=ADMIN_NAME;lgLoading(false);await bootApp('admin');
+    isRealAdmin=true;myDisplayName=ADMIN_NAME;lgLoading(false);
+    try{await bootApp('admin');}
+    catch(bootErr){console.error('bootApp:',bootErr);lgShowErr('Login berhasil, tetapi tampilan aplikasi gagal dimuat. Silakan muat ulang halaman.');}
   }catch(err){
-    console.error('loginAdmin/bootApp:',err);
+    console.error('loginAdmin:',err);
     if(err.code==='auth/user-not-found'||err.code==='auth/invalid-credential'){
       try{
         await fbAuth.createUserWithEmailAndPassword(ADMIN_EMAIL,pass);
         await fbDb.collection('meta').doc('config').set({adminMustChangePassword:true},{merge:true});
-        isRealAdmin=true;myDisplayName=ADMIN_NAME;lgLoading(false);await bootApp('admin');
+        isRealAdmin=true;myDisplayName=ADMIN_NAME;lgLoading(false);
+        try{await bootApp('admin');}
+        catch(bootErr){console.error('bootApp:',bootErr);lgShowErr('Akun berhasil dibuat, tetapi tampilan aplikasi gagal dimuat. Silakan muat ulang halaman.');}
       }catch(err2){
         if(err2.code==='auth/email-already-in-use'){lgLoading(false);lgShowErr('Password salah');}
         else{lgLoading(false);lgShowErr('Gagal membuat akun: '+fbErrMsg(err2));}
